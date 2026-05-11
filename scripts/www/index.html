@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1E90FF">
+<title>酷学题库系统（安卓版）</title>
+<style type="text/css">
+  * { box-sizing: border-box; }
+  body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; margin: 0; padding: 0; background-color: #f0f8ff; padding-bottom: env(safe-area-inset-bottom); }
+  .header { background-color: #1E90FF; color: white; padding: 15px; text-align: center; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(30, 144, 255, 0.3); position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 1.2rem; margin: 0; }
+  .menu { background-color: #E6F2FF; padding: 10px; border-radius: 10px; margin: 10px; box-shadow: 0 2px 10px rgba(253, 228, 207, 0.5); overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+  .menu button { background-color: #4169E1; color: white; border: none; padding: 8px 15px; margin-right: 8px; cursor: pointer; border-radius: 15px; font-weight: bold; font-size: 0.85rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(65, 105, 225, 0.4); }
+  .menu button:hover { background-color: #0066CC; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 102, 204, 0.5); }
+  .content { padding: 10px; }
+  .panel { background-color: white; border-radius: 15px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+  .form-group { margin-bottom: 15px; }
+  label { display: inline-block; font-weight: bold; color: #666; font-size: 0.9rem; }
+  input, select, textarea { width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 16px; transition: all 0.3s ease; box-sizing: border-box; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #4169E1; box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1); }
+  .question-list { margin-top: 15px; }
+  .question-item { border: 2px solid #f0f0f0; padding: 12px; margin-bottom: 12px; border-radius: 12px; transition: all 0.3s ease; }
+  .stats { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+  .stat-card { flex: 1; min-width: 150px; background-color: #f8f9fa; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
+  .stat-card h3 { font-size: 0.85rem; color: #666; margin: 0 0 5px 0; }
+  .stat-card p { font-size: 1.5rem; font-weight: bold; color: #4169E1; margin: 0; }
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); overflow-y: auto; z-index: 1000; }
+  .modal-content { background-color: white; margin: 20px auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+  .modal-scroll-container { max-height: 60vh; overflow-y: auto; padding-right: 5px; }
+  .close { float: right; cursor: pointer; font-size: 28px; color: #999; padding: 5px; }
+  .close:hover { color: #0066CC; }
+  .btn { border-radius: 15px !important; padding: 12px 20px; margin: 5px; font-size: 16px; }
+  .btn-primary { background-color: #4169E1; color: white; border: none; }
+  .btn-secondary { background-color: #e0e0e0; color: #666; border: none; }
+  .add-type-btn { background-color: #4169E1; color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-size: 24px; cursor: pointer; position: absolute; right: -40px; top: 50%; transform: translateY(-50%); box-shadow: 0 2px 8px rgba(65, 105, 225, 0.4); display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; z-index: 10; }
+  @media (max-width: 480px) {
+    .add-type-btn { right: -36px; width: 30px; height: 30px; font-size: 20px; }
+  }
+  .selection-box { border: 2px dashed #4169E1; background-color: rgba(65, 105, 225, 0.1); position: absolute; cursor: move; border-radius: 8px; }
+  .image-container { position: relative; overflow: hidden; border: 2px solid #e0e0e0; border-radius: 12px; }
+  .handle { width: 20px; height: 20px; background-color: #0066CC; position: absolute; border-radius: 50%; border: 2px solid white; }
+  .handle-tl { top: -10px; left: -10px; }
+  .handle-tr { top: -10px; right: -10px; }
+  .handle-bl { bottom: -10px; left: -10px; }
+  .handle-br { bottom: -10px; right: -10px; }
+  .crosshair-cursor { cursor: crosshair; }
+  .hidden { display: none !important; }
+  .block { display: block; }
+  .bg-white { background-color: white; }
+  .bg-gray-50 { background-color: #f9fafb; }
+  .text-gray-500 { color: #6b7280; }
+  .text-gray-700 { color: #4b5563; }
+  .text-orange-700 { color: #b45309; }
+  .bg-orange-50 { background-color: #fffbeb; }
+  .border-orange-100 { border-color: #ffedd5; }
+  .border { border: 1px solid #e5e7eb; }
+  .border-t { border-top: 1px solid #e5e7eb; }
+  .grid { display: grid; }
+  .flex { display: flex; }
+  .items-center { align-items: center; }
+  .justify-center { justify-content: center; }
+  .justify-between { justify-content: space-between; }
+  .text-white { color: white; }
+  .font-medium { font-weight: 500; }
+  .font-bold { font-weight: 700; }
+  .transition { transition: all 0.3s ease; }
+  .space-y-4 > * + * { margin-top: 1rem; }
+  .space-y-2 > * + * { margin-top: 0.5rem; }
+  .list-disc { list-style-type: disc; }
+  .overflow-y-auto { overflow-y: auto; }
+  .rounded-lg { border-radius: 8px; }
+  .rounded-xl { border-radius: 12px; }
+  .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+  .p-6 { padding: 1.5rem; }
+  .p-4 { padding: 1rem; }
+  .p-3 { padding: 0.75rem; }
+  .p-2 { padding: 0.5rem; }
+  .m-2 { margin: 0.5rem; }
+  .mt-1 { margin-top: 0.25rem; }
+  .mt-4 { margin-top: 1rem; }
+  .mb-1 { margin-bottom: 0.25rem; }
+  .mb-2 { margin-bottom: 0.5rem; }
+  .mb-3 { margin-bottom: 0.75rem; }
+  .mb-4 { margin-bottom: 1rem; }
+  .mb-6 { margin-bottom: 1.5rem; }
+  .pt-4 { padding-top: 1rem; }
+  .text-sm { font-size: 0.875rem; }
+  .text-xs { font-size: 0.75rem; }
+  .text-xl { font-size: 1.25rem; }
+  .text-3xl { font-size: 1.875rem; }
+  .text-lg { font-size: 1.125rem; }
+  .border-dashed { border-style: dashed; }
+  .border-gray-300 { border-color: #d1d5db; }
+  .border-gray-100 { border-color: #f3f4f6; }
+  .bg-gray-200 { background-color: #e5e7eb; }
+  .bg-gray-600 { background-color: #4b5563; }
+  .hover\:bg-gray-50:hover { background-color: #f9fafb; }
+  .hover\:bg-gray-100:hover { background-color: #f3f4f6; }
+  .hover\:bg-gray-300:hover { background-color: #d1d5db; }
+  .cursor-pointer { cursor: pointer; }
+  .w-full { width: 100%; }
+  .max-h-60 { max-height: 15rem; }
+  .h-32 { height: 8rem; }
+  .min-h-\[300px\] { min-height: 300px; }
+  .fixed { position: fixed; }
+  .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+  .bg-black { background-color: black; }
+  .bg-opacity-50 { background-color: rgba(0, 0, 0, 0.5); }
+  .z-50 { z-index: 50; }
+  .max-w-lg { max-width: 32rem; }
+  .max-h-\[80vh\] { max-height: 80vh; }
+  .pl-5 { padding-left: 1.25rem; }
+  .gap-4 { gap: 1rem; }
+  .gap-8 { gap: 2rem; }
+  .sticky { position: sticky; }
+  .top-4 { top: 1rem; }
+  .relative { position: relative; }
+  
+  /* 图片裁剪模态框样式 */
+  .crop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 2000; }
+  .crop-container { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  .crop-header { padding: 15px; background-color: #1E90FF; color: white; text-align: center; font-size: 1.1rem; font-weight: bold; }
+  .crop-body { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+  .crop-footer { padding: 15px; background-color: #f8f9fa; display: flex; gap: 10px; justify-content: center; }
+  .crop-canvas-container { position: relative; max-width: 100%; max-height: 70vh; overflow: hidden; }
+  .crop-canvas { display: block; max-width: 100%; max-height: 70vh; }
+  .crop-area { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); cursor: move; }
+  .crop-handle { position: absolute; width: 20px; height: 20px; background-color: #1E90FF; border: 2px solid #fff; border-radius: 50%; }
+  .crop-handle-tl { top: -10px; left: -10px; cursor: nw-resize; }
+  .crop-handle-tr { top: -10px; right: -10px; cursor: ne-resize; }
+  .crop-handle-bl { bottom: -10px; left: -10px; cursor: sw-resize; }
+  .crop-handle-br { bottom: -10px; right: -10px; cursor: se-resize; }
+  .crop-btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; flex: 1; max-width: 150px; }
+  .crop-btn-primary { background-color: #4169E1; color: white; }
+  .crop-btn-secondary { background-color: #e0e0e0; color: #666; }
+  .crop-btn-success { background-color: #4CAF50; color: white; }
+  .crop-btn-danger { background-color: #FF6B6B; color: white; }
+  .camera-btn { background-color: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 12px; cursor: pointer; font-size: 14px; margin-left: 8px; }
+
+  @media (min-width: 640px) {
+    .menu { display: flex; flex-wrap: wrap; justify-content: center; }
+    .stats { gap: 15px; }
+    .grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .lg\:col-span-1 { grid-column: span 1 / span 1; }
+    .lg\:col-span-2 { grid-column: span 2 / span 2; }
+  }
+
+  @media (max-width: 480px) {
+    .header { padding: 12px; }
+    .header h1 { font-size: 1.1rem; }
+    .panel { padding: 12px; }
+    .modal-content { width: 95%; margin: 10px auto; padding: 15px; }
+    .stat-card { min-width: 120px; padding: 10px; }
+    .stat-card p { font-size: 1.3rem; }
+  }
+
+  .export-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+  .export-btns button { flex: 1; min-width: 120px; padding: 10px; border-radius: 12px; }
+  
+  .section { background-color: #f8f9fa; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+  .config-section { display: grid; gap: 12px; }
+  .config-item { display: flex; flex-direction: column; gap: 5px; }
+
+  #autoGenerate { padding: 0; }
+  #autoGenerate > .panel { border-radius: 0; box-shadow: none; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>酷学题库系统（安卓版）</h1>
+  </div>
+  <div class="menu">
+      <button onclick="showPanel('dashboard')">首页</button>
+      <button onclick="showPanel('questionList')">题目列表</button>
+      <button onclick="showPanel('addQuestion')">添加题目</button>
+      <button onclick="showPanel('aiExpand')">智能扩题</button>
+  </div>
+  <div class="content">
+    <div id="dashboard" class="panel">
+      <h2>首页</h2>
+      <div class="stats">
+        <div class="stat-card">
+          <h3>总题目数</h3>
+          <p id="totalQuestions">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>今日新增</h3>
+          <p id="todayAdded">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>错误率</h3>
+          <p id="errorRate">0%</p>
+        </div>
+        <div class="stat-card">
+          <h3>知识点</h3>
+          <p id="masteredTopics">0</p>
+        </div>
+      </div>
+      <div>
+        <h3>最近添加的题目</h3>
+        <div id="recentQuestions"></div>
+      </div>
+      <div style="margin-top: 15px;">
+        <button onclick="BackupData()" class="btn btn-primary">
+          备份数据
+        </button>
+        <button onclick="RestoreData()" class="btn btn-secondary">
+          恢复数据
+        </button>
+      </div>
+    </div>
+
+    <div id="questionList" class="panel" style="display:none;">
+      <h2>题目列表</h2>
+      <div class="form-group" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <input type="text" id="searchQuestions" placeholder="搜索题目...">
+        <select id="filterBankType">
+          <option value="">所有题库</option>
+          <option value="english2">英语二</option>
+          <option value="politics">考研政治</option>
+          <option value="economics396">396经济学综合</option>
+          <option value="education333">333教育学综合</option>
+          <option value="business">国际商务</option>
+          <option value="math">高等数学基础</option>
+          <option value="calculus">微积分特训</option>
+        </select>
+        <select id="filterDifficulty">
+          <option value="">所有难度</option>
+          <option value="easy">简单</option>
+          <option value="medium">中等</option>
+          <option value="hard">困难</option>
+        </select>
+        <select id="filterTopic">
+          <option value="">所有知识点</option>
+        </select>
+        <select id="filterType">
+          <option value="">所有类型</option>
+          <option value="single">单选题</option>
+          <option value="multiple">多选题</option>
+          <option value="judgment">判断题</option>
+          <option value="essay">简答题</option>
+        </select>
+        <button onclick="searchQuestions()" class="btn btn-primary">搜索</button>
+      </div>
+      <div class="question-list" id="questionListContainer"></div>
+    </div>
+
+    <div id="addQuestion" class="panel" style="display:none;">
+      <h2>添加题目</h2>
+      <div class="form-group">
+        <label>题目内容:</label>
+        <textarea id="questionContent" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label>难度:</label>
+        <select id="questionDifficulty">
+          <option value="easy">简单</option>
+          <option value="medium">中等</option>
+          <option value="hard">困难</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>知识点:</label>
+        <input type="text" id="questionTopic">
+      </div>
+      <div class="form-group">
+        <label>题目类型:</label>
+        <div class="relative">
+          <select id="questionType">
+            <option value="single">单选题</option>
+            <option value="multiple">多选题</option>
+            <option value="judgment">判断题</option>
+            <option value="essay">简答题</option>
+          </select>
+          <button class="add-type-btn" onclick="openAddTypeModal('questionType')">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>题库类型:</label>
+        <div class="relative">
+          <select id="questionBankType">
+            <option value="english">英语</option>
+            <option value="politics">政治</option>
+            <option value="economics">经济学</option>
+            <option value="business">国际商务</option>
+            <option value="math">高等数学</option>
+            <option value="biology">生物学</option>
+            <option value="alpha">Alpha先行者测试库</option>
+          </select>
+          <button class="add-type-btn" onclick="openAddTypeModal('questionBankType')">+</button>
+        </div>
+      </div>
+
+      <div id="addTypeModal" class="modal">
+        <div class="modal-content">
+          <div style="text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e0e0e0;">
+            <h3>新增库命名</h3>
+          </div>
+          <div class="form-group">
+            <label>名称:</label>
+            <input type="text" id="newTypeName" placeholder="请输入新名称">
+          </div>
+          <div style="text-align: center; padding-top: 15px; border-top: 1px solid #e0e0e0; display: flex; justify-content: center; gap: 15px;">
+            <button class="btn btn-primary" onclick="applyAddType()">应用</button>
+            <button class="btn btn-secondary" onclick="closeAddTypeModal()">取消</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>答案:</label>
+        <textarea id="questionAnswer" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label>解析:</label>
+        <textarea id="questionAnalysis" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>题目内容图片:</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="file" id="questionContentImg" accept="image/*" style="flex: 1;">
+          <button type="button" class="camera-btn" onclick="openCamera('questionContentImg')">
+            📷 拍照
+          </button>
+        </div>
+        <div id="questionContentImgPreview" style="margin-top: 8px;"></div>
+      </div>
+      <div class="form-group">
+        <label>答案图片:</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="file" id="questionAnswerImg" accept="image/*" style="flex: 1;">
+          <button type="button" class="camera-btn" onclick="openCamera('questionAnswerImg')">
+            📷 拍照
+          </button>
+        </div>
+        <div id="questionAnswerImgPreview" style="margin-top: 8px;"></div>
+      </div>
+      <div class="form-group">
+        <label>解析图片:</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="file" id="questionAnalysisImg" accept="image/*" style="flex: 1;">
+          <button type="button" class="camera-btn" onclick="openCamera('questionAnalysisImg')">
+            📷 拍照
+          </button>
+        </div>
+        <div id="questionAnalysisImgPreview" style="margin-top: 8px;"></div>
+      </div>
+      <button onclick="saveQuestion()" class="btn btn-primary w-full">保存题目</button>
+    </div>
+
+    <div id="statistics" class="panel" style="display:none;">
+      <h2>数据分析</h2>
+      <div class="form-group">
+        <label>题库类型:</label>
+        <select id="statsQuestionBankType">
+          <option value="">所有题库</option>
+          <option value="english2">英语二</option>
+          <option value="politics">考研政治</option>
+          <option value="economics396">396经济学综合</option>
+          <option value="education333">333教育学综合</option>
+          <option value="business">国际商务</option>
+          <option value="math">高等数学基础</option>
+          <option value="calculus">微积分特训</option>
+        </select>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div>
+          <h3>知识点占比</h3>
+          <canvas id="topicPieChart" width="300" height="300" style="width: 100%; max-width: 300px;"></canvas>
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+            <h3>错频排行榜</h3>
+            <select id="topicFilter" style="flex: 1;">
+              <option value="">所有知识点</option>
+            </select>
+          </div>
+          <div id="errorRanking" style="max-height: 400px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 12px; padding: 10px;"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="autoGenerate" class="panel" style="display:none;">
+      <h2>自动组卷</h2>
+      <div id="questionSelector">
+        <h3>选择题目</h3>
+        <div style="margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <select id="autoFilterDifficulty">
+            <option value="">所有难度</option>
+            <option value="easy">简单</option>
+            <option value="medium">中等</option>
+            <option value="hard">困难</option>
+          </select>
+          <select id="autoFilterType">
+            <option value="">所有类型</option>
+            <option value="single">单选题</option>
+            <option value="multiple">多选题</option>
+            <option value="judgment">判断题</option>
+            <option value="essay">简答题</option>
+          </select>
+          <select id="autoFilterTopic">
+            <option value="">所有知识点</option>
+          </select>
+          <button onclick="FilterAutoQuestions()" class="btn btn-primary">筛选</button>
+        </div>
+        <div id="autoGenerateQuestionList" style="max-height: 300px; overflow-y: auto;"></div>
+        <div class="export-btns">
+          <button onclick="ExportToMarkdown()" class="btn btn-primary">导出Markdown</button>
+          <button onclick="ExportToWord()" class="btn btn-primary">导出Word</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="importQuestion" class="panel" style="display:none;">
+      <h2>错题清洗</h2>
+      <button onclick="document.getElementById('helpModal').classList.remove('hidden')" class="btn btn-primary" style="margin-bottom: 15px;">
+        ❓ 使用帮助
+      </button>
+      <div class="grid" style="gap: 20px;">
+        <div class="lg:col-span-1">
+          <div class="bg-white rounded-xl shadow-sm p-6 sticky top-4">
+            <h2 class="text-xl font-semibold mb-4 flex items-center">
+              <span style="margin-right: 8px; color: #4169E1;">⚙️</span>操作面板
+            </h2>
+            
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">上传包含题目的图片</label>
+              <div class="flex items-center justify-center w-full">
+                <label for="imageUpload" class="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition" style="flex-direction: column;">
+                  <div class="flex items-center justify-center pt-5 pb-6" style="flex-direction: column;">
+                    <span style="font-size: 36px; color: #9ca3af; margin-bottom: 8px;">☁️</span>
+                    <p class="mb-1 text-sm text-gray-600"><span class="font-semibold">点击上传</span> 或拖放图片</p>
+                    <p class="text-xs text-gray-500">支持 JPG, PNG, WEBP 格式</p>
+                  </div>
+                  <input id="imageUpload" type="file" class="hidden" accept="image/*" />
+                </label>
+              </div>
+            </div>
+            
+            <div class="space-y-4 mb-6">
+              <button id="autoDetectBtn" class="w-full p-4" style="background-color: #4169E1; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                ✨ 自动识别题目
+              </button>
+              
+              <button id="addBoxBtn" class="w-full p-4" style="background-color: #98fb98; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                ➕ 手动添加框选
+              </button>
+              
+              <button id="clearAllBtn" class="w-full p-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition flex items-center justify-center">
+                🗑️ 清除所有框选
+              </button>
+            </div>
+            
+            <div class="border-t pt-4">
+              <h3 class="font-medium mb-3">已识别题目 (<span id="boxCount">0</span>)</h3>
+              <div id="boxList" class="max-h-60 overflow-y-auto space-y-2">
+                <p class="text-gray-500 text-sm italic">暂无框选区域</p>
+              </div>
+              
+              <div class="mt-4 space-y-2">
+                <button id="exportAllBtn" class="w-full p-4" style="background-color: #4169E1; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                  📁 导出到相册
+                </button>
+                
+                <button id="exportSelectedBtn" class="w-full p-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition flex items-center justify-center" disabled>
+                  🖼️ 导出选中题目
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
+          <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <span style="margin-right: 8px; color: #4169E1;">🖼️</span>图片预览与框选
+          </h2>
+          
+          <div class="flex justify-center items-center bg-gray-100 rounded-lg p-4 min-h-[300px]" id="previewContainer">
+            <div class="text-center" id="emptyState">
+              <span style="font-size: 48px; color: #d1d5db; margin-bottom: 12px;">🖼️</span>
+              <p class="text-gray-500">上传图片后在此处显示预览</p>
+              <p class="text-gray-400 text-sm mt-1">可在图片上框选题目区域</p>
+            </div>
+            
+            <div class="image-container hidden" id="imageContainer">
+              <img id="previewImage" src="" alt="预览图片" style="max-width: 100%; max-height: 500px;">
+            </div>
+          </div>
+          
+          <div class="mt-4 p-3 bg-orange-50 border border-orange-100 rounded-lg text-sm text-orange-700">
+            💡
+            <span>提示：点击自动识别可快速框选题目，也可手动添加框选并拖动调整大小</span>
+          </div>
+        </div>
+      </div>
+      <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold" style="color: #4169E1;">使用帮助</h3>
+            <button id="closeHelpBtn" class="text-gray-500 hover:text-gray-700">
+              <span style="font-size: 24px;">✕</span>
+            </button>
+          </div>
+          
+          <div class="space-y-4 text-gray-700">
+            <div>
+              <h4 class="font-semibold text-lg mb-2">1. 上传图片</h4>
+              <p>点击上传区域或拖放图片到上传区域，支持JPG、PNG、WEBP格式的图片。</p>
+            </div>
+            
+            <div>
+              <h4 class="font-semibold text-lg mb-2">2. 框选题目</h4>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>自动识别：点击"自动识别题目"按钮，系统会尝试自动框选图片中的所有题目</li>
+                <li>手动添加：点击"手动添加框选"按钮，在图片上点击并拖动创建框选区域</li>
+                <li>调整框选：拖动框选区域可移动位置，拖动边角可调整大小</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 class="font-semibold text-lg mb-2">3. 导出题目</h4>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>导出到相册：点击"导出到相册"，系统会保存所有框选的图片到本地</li>
+                <li>导出选中：在左侧列表选择题目后，点击"导出选中题目"可单独导出</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="aiExpand" class="panel" style="display:none;">
+      <h2>智能扩题</h2>
+      <div style="max-width: 100%;">
+        <div class="section">
+          <h2>AI模型配置</h2>
+          <div class="config-section">
+            <div class="config-item" style="flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <label for="configSelect" style="font-weight: bold; font-size: 14px; color: #555;">已保存配置:</label>
+              <select id="configSelect" style="flex: 1; min-width: 150px;"></select>
+              <button id="deleteConfig" style="background-color: #e74c3c; color: white; border: none; border-radius: 12px; cursor: pointer; padding: 8px 12px; font-size: 14px;">删除</button>
+            </div>
+            <div class="config-item">
+              <label for="configName" style="font-weight: bold; font-size: 14px; color: #555;">配置名称:</label>
+              <input type="text" id="configName" placeholder="例如：OpenAI GPT-4o">
+            </div>
+            <div class="config-item">
+              <label for="modelNote" style="font-weight: bold; font-size: 14px; color: #555;">模型备注:</label>
+              <input type="text" id="modelNote" placeholder="简单描述该模型的特点或用途">
+            </div>
+            <div class="config-item">
+              <label for="apiUrl" style="font-weight: bold; font-size: 14px; color: #555;">API 地址:</label>
+              <input type="text" id="apiUrl" placeholder="https://api.example.com/v1/chat/completions" value="https://api.siliconflow.cn/v1/chat/completions">
+            </div>
+            <div class="config-item">
+              <label for="apiKey" style="font-weight: bold; font-size: 14px; color: #555;">API Key:</label>
+              <input type="password" id="apiKey" placeholder="sk-...">
+            </div>
+            <div class="config-item">
+              <label for="modelName" style="font-weight: bold; font-size: 14px; color: #555;">模型名称:</label>
+              <input type="text" id="modelName" placeholder="gpt-4o">
+            </div>
+            <button id="saveConfig" class="btn btn-primary w-full">保存配置</button>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h2>输入内容</h2>
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <label for="userInput" style="font-weight: bold; font-size: 14px; color: #555;">题目描述:</label>
+              <textarea id="userInput" placeholder="请输入题目描述..." style="padding: 12px; border: 2px solid #e0e0e0; border-radius: 12px; resize: vertical; min-height: 100px; font-size: 14px;"></textarea>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <label for="aiImageUpload" style="font-weight: bold; font-size: 14px; color: #555;">上传图片 (可选):</label>
+              <div style="border: 2px dashed #ddd; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; background-color: #f9fafb;">
+                <input type="file" id="aiImageUpload" accept="image/*" style="display: none;">
+                <label for="aiImageUpload" style="cursor: pointer; color: #666; display: block;">
+                  <span id="aiUploadText">点击或拖拽图片到此处上传</span>
+                </label>
+                <div id="aiImagePreview" style="margin-top: 15px; max-height: 200px; overflow: hidden; border-radius: 10px; border: 2px solid #e0e0e0;"></div>
+              </div>
+            </div>
+            
+            <button id="submitBtn" class="btn btn-primary w-full" style="margin-top: 10px;">生成举一反三</button>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h2>结果展示</h2>
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div id="resultContent" style="padding: 15px; background-color: #f8f9fa; border: 2px solid #e9ecef; border-radius: 12px; min-height: 100px; white-space: pre-wrap; font-size: 14px; overflow-wrap: break-word;"></div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+              <button id="regenerateBtn" class="btn btn-primary" style="flex: 1; display: none;">重新生成</button>
+              <button id="exportWordBtn" class="btn btn-primary" style="flex: 1;">导出Markdown</button>
+              <button id="clearImagesBtn" style="background-color: #e74c3c; color: white; border: none; border-radius: 12px; cursor: pointer; padding: 10px 20px; flex: 1;">清除图片</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="questionModal" class="modal" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h2>题目详情</h2>
+      <div class="modal-scroll-container">
+        <div id="modalQuestionContent"></div>
+      </div>
+      <button onclick="closeModal()" class="btn btn-primary w-full">关闭</button>
+    </div>
+  </div>
+
+  <!-- 图片裁剪模态框 -->
+  <div id="cropModal" class="crop-modal">
+    <div class="crop-container">
+      <div class="crop-header">裁剪图片</div>
+      <div class="crop-body">
+        <div class="crop-canvas-container">
+          <canvas id="cropCanvas" class="crop-canvas"></canvas>
+          <div id="cropArea" class="crop-area">
+            <div class="crop-handle crop-handle-tl"></div>
+            <div class="crop-handle crop-handle-tr"></div>
+            <div class="crop-handle crop-handle-bl"></div>
+            <div class="crop-handle crop-handle-br"></div>
+          </div>
+        </div>
+      </div>
+      <div class="crop-footer">
+        <button type="button" class="crop-btn crop-btn-secondary" onclick="cancelCrop()">取消</button>
+        <button type="button" class="crop-btn crop-btn-primary" onclick="resetCropArea()">重置</button>
+        <button type="button" class="crop-btn crop-btn-success" onclick="confirmCrop()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 摄像头拍照模态框 -->
+  <div id="cameraModal" class="crop-modal">
+    <div class="crop-container">
+      <div class="crop-header">拍照</div>
+      <div class="crop-body">
+        <video id="cameraVideo" autoplay playsinline style="max-width: 100%; max-height: 70vh; border-radius: 8px;"></video>
+      </div>
+      <div class="crop-footer">
+        <button type="button" class="crop-btn crop-btn-secondary" onclick="closeCamera()">取消</button>
+        <button type="button" class="crop-btn crop-btn-primary" onclick="takePhoto()">拍照</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Preload KaTeX
+    let katexLoaded = false;
+    let katexLoadPromise = null;
+    
+    (function preloadKaTeX() {
+        if (katexLoadPromise) return;
+        
+        const cssLink = document.createElement('link');
+        cssLink.rel = 'stylesheet';
+        cssLink.href = './katex-resources/katex.min.css';
+        document.head.appendChild(cssLink);
+        
+        const katexScript = document.createElement('script');
+        katexScript.src = './katex-resources/katex.min.js';
+        const renderScript = document.createElement('script');
+        renderScript.src = './katex-resources/auto-render.min.js';
+        
+        katexLoadPromise = new Promise((resolve) => {
+            let loadedScripts = 0;
+            const totalScripts = 2;
+            const checkLoaded = () => {
+                loadedScripts++;
+                if (loadedScripts === totalScripts) {
+                    katexLoaded = true;
+                    resolve();
+                }
+            };
+            katexScript.onload = checkLoaded;
+            renderScript.onload = checkLoaded;
+            document.head.appendChild(katexScript);
+            document.head.appendChild(renderScript);
+        });
+    })();
+    
+    async function loadKaTeX() {
+        if (katexLoadPromise) await katexLoadPromise;
+    }
+    
+    // Config Manager
+    class ConfigManager {
+        constructor() {
+            this.configs = JSON.parse(localStorage.getItem('aiConfigs') || '{}');
+            this.currentConfig = null;
+        }
+        saveConfig(name, config) {
+            this.configs[name] = config;
+            localStorage.setItem('aiConfigs', JSON.stringify(this.configs));
+            this.currentConfig = name;
+            this.updateConfigSelect();
+        }
+        deleteConfig(name) {
+            delete this.configs[name];
+            localStorage.setItem('aiConfigs', JSON.stringify(this.configs));
+            this.updateConfigSelect();
+        }
+        getConfig(name) {
+            return this.configs[name];
+        }
+        updateConfigSelect() {
+            const select = document.getElementById('configSelect');
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">-- 选择配置 --</option>';
+            for (const name in this.configs) {
+                if (this.configs.hasOwnProperty(name)) {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                }
+            }
+            if (this.configs[currentValue]) select.value = currentValue;
+            else select.value = '';
+        }
+    }
+    
+    const configManager = new ConfigManager();
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        configManager.updateConfigSelect();
+    });
+    
+    document.getElementById('saveConfig').addEventListener('click', function() {
+        const configName = document.getElementById('configName').value.trim();
+        if (!configName) {
+            alert('请输入配置名称！');
+            return;
+        }
+        const config = {
+            apiUrl: document.getElementById('apiUrl').value,
+            apiKey: document.getElementById('apiKey').value,
+            modelName: document.getElementById('modelName').value,
+            note: document.getElementById('modelNote').value
+        };
+        configManager.saveConfig(configName, config);
+        alert('配置已保存！');
+    });
+    
+    document.getElementById('configSelect').addEventListener('change', function() {
+        const configName = this.value;
+        if (configName) {
+            const config = configManager.getConfig(configName);
+            document.getElementById('configName').value = configName;
+            document.getElementById('modelNote').value = config.note || '';
+            document.getElementById('apiUrl').value = config.apiUrl;
+            document.getElementById('apiKey').value = config.apiKey;
+            document.getElementById('modelName').value = config.modelName;
+        }
+    });
+    
+    document.getElementById('deleteConfig').addEventListener('click', function() {
+        const configName = document.getElementById('configSelect').value;
+        if (!configName) {
+            alert('请先选择要删除的配置！');
+            return;
+        }
+        if (confirm(`确定要删除配置 "${configName}" 吗？`)) {
+            configManager.deleteConfig(configName);
+            document.getElementById('configName').value = '';
+            document.getElementById('modelNote').value = '';
+            document.getElementById('apiUrl').value = 'https://api.siliconflow.cn/v1/chat/completions';
+            document.getElementById('apiKey').value = '';
+            document.getElementById('modelName').value = '';
+            alert('配置已删除！');
+        }
+    });
+    
+    let uploadedImage = null;
+    let uploadedImageData = null;
+    const aiImageUpload = document.getElementById('aiImageUpload');
+    const aiImagePreview = document.getElementById('aiImagePreview');
+    const aiUploadText = document.getElementById('aiUploadText');
+    
+    aiImageUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) handleImageUpload(file);
+    });
+    
+    const aiUploadArea = aiImageUpload.parentElement;
+    aiUploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        aiUploadArea.style.borderColor = '#4169E1';
+        aiUploadArea.style.backgroundColor = '#f0f8ff';
+    });
+    aiUploadArea.addEventListener('dragleave', function() {
+        aiUploadArea.style.borderColor = '#ddd';
+        aiUploadArea.style.backgroundColor = '#f9fafb';
+    });
+    aiUploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        aiUploadArea.style.borderColor = '#ddd';
+        aiUploadArea.style.backgroundColor = '#f9fafb';
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) handleImageUpload(file);
+    });
+    
+    async function handleImageUpload(file) {
+        uploadedImage = file;
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            aiImagePreview.innerHTML = `<img src="${e.target.result}" alt="上传的图片" style="max-width: 100%; max-height: 200px; display: block; margin: 0 auto;">`;
+            aiUploadText.textContent = `已上传: ${file.name} (正在分析...)`;
+            uploadedImageData = e.target.result;
+            
+            try {
+                const imageDescription = await analyzeImage(file);
+                const userInput = document.getElementById('userInput');
+                userInput.value = imageDescription;
+                aiUploadText.textContent = `已上传: ${file.name} (分析完成)`;
+                await callAI();
+            } catch (error) {
+                console.error('图片分析失败:', error);
+                aiUploadText.textContent = `已上传: ${file.name} (分析失败)`;
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    async function analyzeImage(imageFile) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                resolve('图片内容：用户上传了一张题目图片，请根据此图片生成3道类似的举一反三题目');
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(imageFile);
+        });
+    }
+    
+    async function callAI() {
+        const userInput = document.getElementById('userInput').value;
+        if (!uploadedImageData && !userInput.trim()) {
+            alert('请输入题目描述或上传图片！');
+            return;
+        }
+        const configName = document.getElementById('configSelect').value;
+        let config;
+        if (configName) {
+            config = configManager.getConfig(configName);
+        } else {
+            config = {
+                apiUrl: document.getElementById('apiUrl').value,
+                apiKey: document.getElementById('apiKey').value,
+                modelName: document.getElementById('modelName').value
+            };
+        }
+        if (!config.apiUrl || !config.apiKey || !config.modelName) {
+            alert('请先配置API信息！');
+            return;
+        }
+        const resultContent = document.getElementById('resultContent');
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '生成中...';
+        resultContent.textContent = '正在生成...';
+        
+        try {
+            let messages = [
+                {
+                    role: 'system',
+                    content: '角色设定： 你是一位拥有 20 年经验的顶级学科命题专家，擅长深度思维建模和创新型试题设计。核心任务：请基于我提供的原始题目，进行"举一反三"的创新型题目生成。执行要求：拒绝肤浅修改，禁止仅仅更改数字。命题思维迁移：保持核心考查的思维模型不变，但将应用场景迁移到全新的领域。输出格式：反三题目、思维连接点。'
+                },
+                {
+                    role: 'user',
+                    content: uploadedImageData ? [
+                        { type: 'text', text: userInput || '请根据以下图片内容生成3道类似的举一反三题目' },
+                        { type: 'image_url', image_url: { url: uploadedImageData } }
+                    ] : userInput
+                }
+            ];
+            
+            try { new URL(config.apiUrl); } catch (e) {
+                throw new Error('API地址格式错误！');
+            }
+            
+            const response = await fetch(config.apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+                body: JSON.stringify({ model: config.modelName, messages: messages, temperature: 0.7 })
+            });
+            
+            if (!response.ok) {
+                let errorMsg;
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.error?.message || errorData.message || `HTTP错误！状态码: ${response.status}`;
+                    if (response.status === 401) errorMsg = '认证失败！请检查API Key是否正确';
+                    else if (response.status === 404) errorMsg = 'API地址错误！请检查URL是否正确';
+                    else if (response.status === 429) errorMsg = '请求过于频繁，请稍后再试';
+                    else if (response.status === 400) errorMsg = `请求参数错误！${errorMsg}`;
+                } catch (e) {
+                    errorMsg = `HTTP错误！状态码: ${response.status}`;
+                }
+                throw new Error(errorMsg);
+            }
+            
+            const data = await response.json();
+            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                throw new Error('API响应格式不符合预期！');
+            }
+            
+            const result = data.choices[0].message.content;
+            resultContent.innerHTML = result;
+            document.getElementById('regenerateBtn').style.display = 'inline-block';
+            
+            await loadKaTeX();
+            try {
+                if (typeof renderMathInElement !== 'undefined') {
+                    renderMathInElement(resultContent, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false,
+                        errorColor: '#cc0000'
+                    });
+                }
+            } catch (error) {
+                console.error('KaTeX渲染失败:', error);
+            }
+        } catch (error) {
+            console.error('AI调用失败详情:', error);
+            let errorMsg = error.message;
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                errorMsg = '网络请求失败！请检查API地址是否正确，确保网络连接正常。';
+            }
+            resultContent.textContent = `生成失败: ${errorMsg}`;
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '生成举一反三';
+        }
+    }
+    
+    document.getElementById('submitBtn').addEventListener('click', callAI);
+    document.getElementById('regenerateBtn').addEventListener('click', callAI);
+    
+    document.getElementById('exportWordBtn').addEventListener('click', async function() {
+        const resultContent = document.getElementById('resultContent').innerText;
+        if (!resultContent || resultContent === '正在生成...') {
+            alert('请先生成题目后再导出！');
+            return;
+        }
+        try {
+            const blob = new Blob([resultContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const fileName = `智能扩题_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.md`;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert(`Markdown文档已成功导出：${fileName}`);
+        } catch (error) {
+            console.error('导出Markdown失败:', error);
+            alert('导出Markdown失败：' + error.message);
+        }
+    });
+    
+    document.getElementById('clearImagesBtn').addEventListener('click', function() {
+        ClearPageImages();
+    });
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
