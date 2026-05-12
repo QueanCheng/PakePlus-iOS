@@ -211,6 +211,13 @@
           恢复数据
         </button>
       </div>
+      <div style="margin-top: 10px;">
+        <button onclick="UploadBackupToOSS()" class="btn btn-primary" style="background-color: #28a745; width: 100%;">
+          <i class="fa fa-cloud-upload"></i> 上传备份到阿里云 OSS
+        </button>
+      </div>
+      <div id="uploadHistoryList" style="margin-top: 15px; max-height: 300px; overflow-y: auto;">
+      </div>
     </div>
 
     <div id="questionList" class="panel" style="display:none;">
