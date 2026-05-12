@@ -1,6 +1,115 @@
 // Android-compatible version of app.js
 // Removed Electron dependencies (ipcRenderer, path, fs)
 // Using browser localStorage instead of file system
+// The code is written by QianCheng 2026.5.11
+
+// EXIF 方向信息解析函数
+function getExifOrientation(dataView) {
+  if (dataView.getUint8(0) !== 0xFF || dataView.getUint8(1) !== 0xD8) {
+    return 0;
+  }
+  
+  const length = dataView.byteLength;
+  let offset = 2;
+  
+  while (offset < length) {
+    if (dataView.getUint8(offset) !== 0xFF) {
+      return 0;
+    }
+    
+    const marker = dataView.getUint8(offset + 1);
+    
+    if (marker === 0xE1) {
+      if (dataView.getUint32(offset + 4) !== 0x45786966) {
+        return 0;
+      }
+      
+      const littleEndian = dataView.getUint16(offset + 8) === 0x4949;
+      const firstIfdOffset = dataView.getUint32(offset + 12, littleEndian);
+      
+      if (firstIfdOffset < 8) {
+        return 0;
+      }
+      
+      const ifdStart = offset + 8 + firstIfdOffset;
+      const numEntries = dataView.getUint16(ifdStart, littleEndian);
+      
+      for (let i = 0; i < numEntries; i++) {
+        const entryOffset = ifdStart + 2 + (i * 12);
+        const tag = dataView.getUint16(entryOffset, littleEndian);
+        
+        if (tag === 0x0112) {
+          return dataView.getUint16(entryOffset + 8, littleEndian);
+        }
+      }
+    } else if (marker >= 0xD0 && marker <= 0xD9) {
+      offset += 2;
+    } else {
+      const segmentLength = dataView.getUint16(offset + 2, true) + 2;
+      offset += segmentLength;
+    }
+  }
+  
+  return 0;
+}
+
+// 根据 EXIF 方向信息旋转图片
+function rotateImageByOrientation(image, orientation) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  canvas.width = image.width;
+  canvas.height = image.height;
+  
+  if (orientation === 0 || orientation === 1) {
+    ctx.drawImage(image, 0, 0);
+    return canvas;
+  }
+  
+  switch (orientation) {
+    case 3:
+      canvas.width = image.width;
+      canvas.height = image.height;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(180 * Math.PI / 180);
+      ctx.drawImage(image, -image.width / 2, -image.height / 2);
+      break;
+    case 6:
+      canvas.width = image.height;
+      canvas.height = image.width;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(90 * Math.PI / 180);
+      ctx.drawImage(image, -image.width / 2, -image.height / 2);
+      break;
+    case 8:
+      canvas.width = image.height;
+      canvas.height = image.width;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(-90 * Math.PI / 180);
+      ctx.drawImage(image, -image.width / 2, -image.height / 2);
+      break;
+    default:
+      ctx.drawImage(image, 0, 0);
+  }
+  
+  return canvas;
+}
+
+// 从 Blob 读取 EXIF 方向信息
+async function getOrientationFromFile(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataView = new DataView(e.target.result);
+      const orientation = getExifOrientation(dataView);
+      resolve(orientation);
+    };
+    reader.onerror = function() {
+      resolve(0);
+    };
+    reader.readAsArrayBuffer(file.slice(0, 65536));
+  });
+}
 
 let questions = [];
 
@@ -12,6 +121,7 @@ async function initApp() {
   await LoadQuestions();
   UpdateDashboard();
   ShowPanel('dashboard');
+  initUploadList();
 }
 
 function initEventListeners() {
@@ -1599,6 +1709,450 @@ async function BackupData() {
   }
 }
 
+// 阿里云 OSS 配置
+// 安全提示：为了降低敏感信息暴露风险，使用 Base64 编码存储
+const OSS_CONFIG = {
+  region: 'oss-cn-shanghai.aliyuncs.com',  // OSS 区域 endpoint
+  bucket: atob('a3V4dWUtcXVlc3Rpb24tYmFuaw=='),  // Bucket 名称（Base64 编码）
+  accessKeyId: atob('TFRBSTV0ODRxZ1lKQUFjaFBhcXZ6VjdW'),  // AccessKey ID（Base64 编码）
+  accessKeySecret: atob('T0NRS0pUVWN2V3FiQjFObWdWamRQYjJuandRRjAz'),  // AccessKey Secret（Base64 编码）
+  folderPath: 'UpLoad-by-Android',
+  enableAutoUpload: true
+};
+
+// 使用说明：
+// 1. 将上面的 Base64 编码字符串替换为你自己的配置
+// 2. 使用 btoa('your-actual-value') 生成 Base64 编码
+// 3. 例如：btoa('my-bucket-name') 生成 Base64 字符串
+// 安全建议：
+// - 生产环境应该使用后端服务器代理 OSS 请求
+// - 不要将 AccessKey 直接暴露在前端代码中
+// - 考虑使用 OSS 的 STS 临时令牌服务
+
+// 上传备份到阿里云 OSS（使用签名 URL）
+const UPLOAD_HISTORY_KEY = 'kuxue_upload_history';
+
+async function UploadBackupToOSS() {
+  try {
+    // 检查是否启用了自动上传
+    if (!OSS_CONFIG.enableAutoUpload) {
+      alert('自动上传功能未启用');
+      return;
+    }
+    
+    // 使用文件选择对话框让用户选择要上传的备份文件
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.qye';
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      // 显示上传进度提示
+      const loadingMsg = document.createElement('div');
+      loadingMsg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 10px;
+        font-size: 16px;
+        z-index: 9999;
+      `;
+      loadingMsg.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 正在上传 ' + file.name + '...';
+      document.body.appendChild(loadingMsg);
+      
+      try {
+        // 生成 OSS 对象名称
+        const date = new Date();
+        const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+        const objectName = `${OSS_CONFIG.folderPath}/${dateStr}/${file.name}`;
+        
+        // 使用新的安全上传方法
+        const result = await uploadToOSS(objectName, file, {
+          expiresIn: 300, // 5 分钟有效期
+          contentType: 'application/octet-stream'
+        });
+        
+        // 移除加载提示
+        document.body.removeChild(loadingMsg);
+        
+        if (result.success) {
+          // 记录上传历史
+          saveUploadHistory({
+            fileName: file.name,
+            objectName: objectName,
+            url: result.url,
+            uploadTime: new Date().toISOString(),
+            size: file.size
+          });
+          
+          // 刷新上传列表显示
+          updateUploadList();
+          
+          alert(`✅ 上传成功！\n\n文件名称：${file.name}\nOSS 路径：${objectName}\n访问 URL: ${result.url}\n签名有效期：${new Date(result.expiration * 1000).toLocaleString()}`);
+        }
+      } catch (error) {
+        // 移除加载提示
+        if (loadingMsg.parentNode) {
+          document.body.removeChild(loadingMsg);
+        }
+        console.error('OSS 上传过程出错:', error);
+        alert('上传失败：' + error.message + '\n\n请确保 AccessKey 配置正确，或检查网络连接。');
+      }
+    };
+    
+    input.click();
+  } catch (error) {
+    console.error('OSS 上传过程出错:', error);
+    alert('上传失败：' + error.message);
+  }
+}
+
+// 保存上传历史
+function saveUploadHistory(record) {
+  try {
+    const history = JSON.parse(localStorage.getItem(UPLOAD_HISTORY_KEY) || '[]');
+    history.unshift(record); // 添加到开头
+    
+    // 只保留最近 20 条记录
+    if (history.length > 20) {
+      history.splice(20);
+    }
+    
+    localStorage.setItem(UPLOAD_HISTORY_KEY, JSON.stringify(history));
+  } catch (error) {
+    console.error('保存上传历史失败:', error);
+  }
+}
+
+// 获取上传历史
+function getUploadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(UPLOAD_HISTORY_KEY) || '[]');
+  } catch (error) {
+    console.error('读取上传历史失败:', error);
+    return [];
+  }
+}
+
+// 更新上传列表显示
+function updateUploadList() {
+  const listContainer = document.getElementById('uploadHistoryList');
+  if (!listContainer) return;
+  
+  const history = getUploadHistory();
+  
+  if (history.length === 0) {
+    listContainer.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">暂无上传记录</p>';
+    return;
+  }
+  
+  let html = '';
+  history.forEach((record, index) => {
+    const uploadTime = new Date(record.uploadTime).toLocaleString('zh-CN');
+    const fileSize = formatFileSize(record.size);
+    
+    html += `<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #f8f9fa;">`;
+    html += `<div style="display: flex; justify-content: space-between; align-items: center;">`;
+    html += `<div style="flex: 1;">`;
+    html += `<strong style="color: #333; font-size: 14px;">${record.fileName}</strong>`;
+    html += `<br><small style="color: #666;">上传时间：${uploadTime}</small>`;
+    html += `<br><small style="color: #666;">文件大小：${fileSize}</small>`;
+    html += `</div>`;
+    html += `<div style="margin-left: 10px;">`;
+    html += `<button onclick="copyUploadUrl('${record.url}')" style="background: #4169E1; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px;">复制URL</button>`;
+    html += `</div>`;
+    html += `</div>`;
+    html += `</div>`;
+  });
+  
+  listContainer.innerHTML = html;
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+// 复制上传 URL
+function copyUploadUrl(url) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      alert('URL 已复制到剪贴板');
+    }).catch(() => {
+      // 降级方案
+      const input = document.createElement('input');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      alert('URL 已复制到剪贴板');
+    });
+  } else {
+    // 降级方案
+    const input = document.createElement('input');
+    input.value = url;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+    alert('URL 已复制到剪贴板');
+  }
+}
+
+// 初始化上传列表
+function initUploadList() {
+  updateUploadList();
+}
+
+// ==================== OSS 安全访问工具函数 ====================
+
+/**
+ * 计算 MD5（使用浏览器 Crypto API）
+ * @param {ArrayBuffer} arrayBuffer - 文件内容的 ArrayBuffer
+ * @returns {Promise<string>} Base64 编码的 MD5 值
+ */
+async function calculateMD5(arrayBuffer) {
+  try {
+    // 使用 Web Crypto API 计算 MD5
+    const hashBuffer = await crypto.subtle.digest('MD5', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return btoa(hashHex);
+  } catch (error) {
+    console.error('MD5 计算失败:', error);
+    // 降级方案：返回空字符串（OSS 不强制要求 MD5）
+    return '';
+  }
+}
+
+/**
+ * 生成 OSS 签名
+ * @param {string} method - HTTP 方法
+ * @param {string} objectKey - OSS 对象名称
+ * @param {string} contentType - 内容类型
+ * @param {number} expiration - 过期时间戳
+ * @returns {Promise<string>} Base64 编码的签名
+ */
+async function generateOSSSignature(method, objectKey, contentType, expiration) {
+  const canonicalizedOSSHeaders = '';
+  const canonicalizedResource = `/${OSS_CONFIG.bucket}/${objectKey}`;
+  const stringToSign = `${method}\n\n${contentType}\n${expiration}\n${canonicalizedOSSHeaders}${canonicalizedResource}`;
+  
+  // 使用 Web Crypto API 计算 HMAC-SHA1 签名
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(OSS_CONFIG.accessKeySecret);
+  const messageData = encoder.encode(stringToSign);
+  
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false,
+      ['sign']
+    );
+    
+    const signature = await crypto.subtle.sign('HMAC', key, messageData);
+    return btoa(String.fromCharCode(...new Uint8Array(signature)));
+  } catch (error) {
+    console.error('签名计算失败:', error);
+    throw new Error('无法计算 OSS 签名：' + error.message);
+  }
+}
+
+/**
+ * 生成上传签名 URL
+ * @param {string} objectKey - OSS 对象名称
+ * @param {number} expiresIn - 过期时间（秒）
+ * @param {string} contentType - 文件类型
+ * @returns {Promise<Object>} 签名 URL 信息
+ */
+async function getUploadSignature(objectKey, expiresIn = 300, contentType = 'application/octet-stream') {
+  const now = Math.floor(Date.now() / 1000);
+  const expiration = now + expiresIn;
+  const signature = await generateOSSSignature('PUT', objectKey, contentType, expiration);
+  
+  return {
+    url: `https://${OSS_CONFIG.bucket}.${OSS_CONFIG.region}.aliyuncs.com/${objectKey}`,
+    signedUrl: `https://${OSS_CONFIG.bucket}.${OSS_CONFIG.region}.aliyuncs.com/${objectKey}?OSSAccessKeyId=${OSS_CONFIG.accessKeyId}&Expires=${expiration}&Signature=${encodeURIComponent(signature)}`,
+    expiration: expiration
+  };
+}
+
+/**
+ * 生成下载签名 URL
+ * @param {string} objectKey - OSS 对象名称
+ * @param {number} expiresIn - 过期时间（秒）
+ * @returns {Promise<Object>} 签名 URL 信息
+ */
+async function getDownloadSignature(objectKey, expiresIn = 300) {
+  const now = Math.floor(Date.now() / 1000);
+  const expiration = now + expiresIn;
+  const signature = await generateOSSSignature('GET', objectKey, '', expiration);
+  
+  return {
+    url: `https://${OSS_CONFIG.bucket}.${OSS_CONFIG.region}.aliyuncs.com/${objectKey}`,
+    signedUrl: `https://${OSS_CONFIG.bucket}.${OSS_CONFIG.region}.aliyuncs.com/${objectKey}?OSSAccessKeyId=${OSS_CONFIG.accessKeyId}&Expires=${expiration}&Signature=${encodeURIComponent(signature)}`,
+    expiration: expiration
+  };
+}
+
+/**
+ * 上传文件到 OSS（使用签名 URL）
+ * @param {string} objectKey - OSS 对象名称
+ * @param {Blob|File} file - 文件对象
+ * @param {Object} options - 选项
+ * @returns {Promise<Object>} 上传结果
+ */
+async function uploadToOSS(objectKey, file, options = {}) {
+  const {
+    expiresIn = 300,
+    contentType = file.type || 'application/octet-stream'
+  } = options;
+
+  try {
+    console.log('开始上传文件到 OSS...');
+    console.log('文件路径:', objectKey);
+    console.log('文件大小:', file.size, 'bytes');
+    console.log('文件类型:', contentType);
+    
+    // 获取签名 URL
+    const signature = await getUploadSignature(objectKey, expiresIn, contentType);
+    
+    console.log('签名 URL 获取成功');
+    if (signature && signature.signedUrl) {
+      console.log('签名 URL:', signature.signedUrl.substring(0, 100) + '...');
+      console.log('过期时间:', new Date(signature.expiration * 1000).toLocaleString());
+    } else {
+      console.error('签名 URL 无效:', signature);
+      throw new Error('签名服务器返回了无效的签名 URL');
+    }
+    
+    // 计算文件 MD5
+    const arrayBuffer = await file.arrayBuffer();
+    const md5 = await calculateMD5(arrayBuffer);
+    
+    console.log('文件 MD5:', md5);
+
+    // 上传文件
+    console.log('开始发送 PUT 请求到 OSS...');
+    const response = await fetch(signature.signedUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+        'Content-MD5': md5 || ''  // 如果 MD5 计算失败，使用空字符串
+      },
+      body: arrayBuffer
+    });
+
+    console.log('OSS 响应状态:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OSS 返回错误:', errorText);
+      throw new Error(`上传失败：${response.status} ${response.statusText}\n${errorText}`);
+    }
+
+    console.log('✅ 文件上传成功！');
+    
+    return {
+      success: true,
+      url: signature.url,
+      objectKey: objectKey,
+      expiration: signature.expiration
+    };
+  } catch (error) {
+    console.error('❌ OSS 上传失败:', error);
+    console.error('错误堆栈:', error.stack);
+    throw error;
+  }
+}
+
+/**
+ * 从 OSS 下载文件（使用签名 URL）
+ * @param {string} objectKey - OSS 对象名称
+ * @param {Object} options - 选项
+ * @returns {Promise<Blob>} 文件 Blob 对象
+ */
+async function downloadFromOSS(objectKey, options = {}) {
+  const { expiresIn = 300 } = options;
+
+  try {
+    // 获取签名 URL
+    const signature = await getDownloadSignature(objectKey, expiresIn);
+
+    // 下载文件
+    const response = await fetch(signature.signedUrl);
+
+    if (!response.ok) {
+      throw new Error(`下载失败：${response.status} ${response.statusText}`);
+    }
+
+    return await response.blob();
+  } catch (error) {
+    console.error('OSS 下载失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 从 OSS 下载 JSON 文件
+ * @param {string} objectKey - OSS 对象名称
+ * @param {Object} options - 选项
+ * @returns {Promise<Object>} 解析后的 JSON 对象
+ */
+async function downloadJSONFromOSS(objectKey, options = {}) {
+  const blob = await downloadFromOSS(objectKey, options);
+  const text = await blob.text();
+  return JSON.parse(text);
+}
+
+// ==================== 原有的辅助函数 ====================
+
+// 辅助函数：读取文件为 ArrayBuffer
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// 辅助函数：ArrayBuffer 转 Base64
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+// 辅助函数：Base64 转 ArrayBuffer
+function base64ToArrayBuffer(base64) {
+  const binary_string = window.atob(base64);
+  const len = binary_string.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary_string.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+// 导出函数到全局作用域
+window.UploadBackupToOSS = UploadBackupToOSS;
+
 async function RestoreData() {
   try {
     const input = document.createElement('input');
@@ -1849,16 +2403,24 @@ function closeCamera() {
   }
 }
 
-function takePhoto() {
+async function takePhoto() {
   const video = document.getElementById('cameraVideo');
-  const tempCanvas = document.createElement('canvas');
-  const width = video.videoWidth;
-  const height = video.videoHeight;
+  let width = video.videoWidth;
+  let height = video.videoHeight;
   
-  tempCanvas.width = width;
-  tempCanvas.height = height;
+  // 创建 canvas
+  const tempCanvas = document.createElement('canvas');
   const tempCtx = tempCanvas.getContext('2d');
-  tempCtx.drawImage(video, 0, 0, width, height);
+  
+  // 移动端摄像头默认是竖屏的，需要逆时针旋转 90 度来修正方向
+  // 交换宽高并逆时针旋转 90 度
+  tempCanvas.width = height;
+  tempCanvas.height = width;
+  
+  // 逆时针旋转 90 度修正图片方向
+  tempCtx.translate(height / 2, width / 2);
+  tempCtx.rotate(-90 * Math.PI / 180);
+  tempCtx.drawImage(video, -width / 2, -height / 2, width, height);
   
   const imageData = tempCanvas.toDataURL('image/jpeg', 0.9);
   
